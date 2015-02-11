@@ -1,0 +1,15 @@
+gcc createdatafile.c -o cd
+./cd
+
+ gcc pro1part1.c -o pp1
+./pp1
+
+ gcc pro1part2.c -o pp2
+./pp2
+
+gcc pro1part3.c -o pp3 -pthread
+./pp3
+
+
+gcc pro1extra5.c -o ppx5 -pthread
+./ppx5

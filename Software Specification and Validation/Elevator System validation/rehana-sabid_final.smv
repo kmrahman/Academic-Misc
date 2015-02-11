@@ -1,0 +1,338 @@
+MODULE elevatorController()
+
+VAR
+	remainedAsOpen			: 0..6;		-- 0,6: closed, [1,5]: open
+	
+	doorOpen				: boolean;
+	openDoorButton			: boolean;
+	closeDoorButton			: boolean;
+	firstButton				: boolean;
+	secondButton			: boolean;
+	thirdButton				: boolean;
+	firstUpButton			: boolean;
+	secondUpButton			: boolean;
+	secondDownButton		: boolean;
+	thirdDownButton			: boolean;
+	openDoorButtonLight		: boolean;
+	closeDoorButtonLight	: boolean;
+	firstButtonLight		: boolean;
+	secondButtonLight		: boolean;
+	thirdButtonLight		: boolean;
+	firstUpButtonLight		: boolean;
+	secondUpButtonLight		: boolean;
+	secondDownButtonLight	: boolean;
+	thirdDownButtonLight	: boolean;
+	
+	elevatorLevel			: {first, second, third};
+	direction				: {down, steady, up};
+	
+DEFINE
+	doorOpenTimer 		:= 5;
+	doorIsOpen			:= ((doorOpenTimer - remainedAsOpen) < 5) & ((doorOpenTimer - remainedAsOpen) >= 0);
+	doorCanClose		:= ((remainedAsOpen - doorOpenTimer) = 1);
+
+	
+ASSIGN
+	init(remainedAsOpen) 		:= 0;
+	init(doorOpen) 				:= FALSE;
+	init(direction)				:= steady;
+	init(elevatorLevel)			:= first;
+	init(openDoorButton)		:= FALSE;		
+	init(closeDoorButton)		:= FALSE;
+	init(firstButton)			:= FALSE;
+	init(secondButton)			:= FALSE;
+	init(thirdButton)			:= FALSE;
+	init(firstUpButton)			:= FALSE;
+	init(secondUpButton)		:= FALSE;
+	init(secondDownButton)		:= FALSE;
+	init(thirdDownButton)		:= FALSE;
+	init(openDoorButtonLight)	:= FALSE;		
+	init(closeDoorButtonLight)	:= FALSE;
+	init(firstButtonLight)		:= FALSE;
+	init(secondButtonLight)		:= FALSE;
+	init(thirdButtonLight)		:= FALSE;
+	init(firstUpButtonLight)	:= FALSE;
+	init(secondUpButtonLight)	:= FALSE;
+	init(secondDownButtonLight)	:= FALSE;
+	init(thirdDownButtonLight)	:= FALSE;
+	
+	
+--LEVELS:: 
+--assumptions: 	@2nd floor--if direction is up, goes to 3rd floor else goes to 1st floor; @others--nearest floor has higher priority
+
+	next(elevatorLevel) := 	case					
+						elevatorLevel = first & (firstButton = TRUE | firstUpButton = TRUE)	: elevatorLevel;
+						elevatorLevel = first & (firstButton = FALSE & firstUpButton = FALSE) 
+							& (secondButton = TRUE | secondUpButton = TRUE | secondDownButton = TRUE) & doorOpen = FALSE	: second;
+						elevatorLevel = first & (firstButton = FALSE & firstUpButton = FALSE) & thirdButton = TRUE 
+							& (secondButton = FALSE & secondUpButton = FALSE & secondDownButton = FALSE) & doorOpen = FALSE 	: third;
+						
+						elevatorLevel = second & (secondButton = TRUE | secondUpButton = TRUE | secondDownButton = TRUE)	: elevatorLevel;
+						elevatorLevel = second & (secondButton = FALSE & secondUpButton = FALSE & secondDownButton = FALSE) 
+							& (firstButton = TRUE | firstUpButton = TRUE) & direction = down & doorOpen = FALSE	: first;
+						elevatorLevel = second & (secondButton = FALSE & secondUpButton = FALSE & secondDownButton = FALSE) 
+							& (thirdButton = TRUE | thirdDownButton = TRUE) & direction = up & doorOpen = FALSE	: third;
+						
+						elevatorLevel = third & (thirdButton = TRUE | thirdDownButton = TRUE)	: elevatorLevel;						
+						elevatorLevel = third & (thirdButton = FALSE & thirdDownButton = FALSE) & (firstButton = TRUE | firstUpButton = TRUE) 
+							& (secondButton = FALSE & secondUpButton = FALSE & secondDownButton = FALSE) & doorOpen = FALSE	: first;
+						elevatorLevel = third & (thirdButton = FALSE & thirdDownButton = FALSE) 
+							& (secondButton = TRUE | secondUpButton = TRUE | secondDownButton = TRUE) & doorOpen = FALSE	: second;
+
+						TRUE : elevatorLevel;
+					esac;
+	
+
+
+--OPEN_DOOR:: 
+--assumptions: 	openDoorButton/closeDoorButton has higher priority than others; current floor's buttons are served first; 
+	
+	next(doorOpen) := 	case
+						(doorIsOpen = TRUE)	: TRUE;
+						(doorCanClose = TRUE) : FALSE;
+						
+						elevatorLevel = first & (firstButton = TRUE | firstUpButton = TRUE)	: TRUE;
+						elevatorLevel = first & (firstButton = FALSE & firstUpButton = FALSE) & doorOpen = FALSE
+							& (secondButton = TRUE | secondUpButton = TRUE | secondDownButton = TRUE | thirdButton = TRUE | thirdDownButton = TRUE)	: FALSE;
+						elevatorLevel = first & (firstButton = FALSE & firstUpButton = FALSE) & doorOpen = TRUE & (doorIsOpen = TRUE)	
+							& (secondButton = TRUE | secondUpButton = TRUE | secondDownButton = TRUE | thirdButton = TRUE | thirdDownButton = TRUE): TRUE;
+						elevatorLevel = first & (firstButton = FALSE & firstUpButton = FALSE) & doorOpen = TRUE & (doorCanClose = TRUE) : FALSE;
+						
+						elevatorLevel = second & (secondButton = TRUE | secondUpButton = TRUE | secondDownButton = TRUE)	: TRUE;
+						elevatorLevel = second & (secondButton = FALSE & secondUpButton = FALSE & secondDownButton = FALSE) & doorOpen = FALSE
+							& (firstButton = TRUE | firstUpButton = TRUE | thirdButton = TRUE | thirdDownButton = TRUE)	: FALSE;
+						elevatorLevel = second & (secondButton = FALSE & secondUpButton = FALSE & secondDownButton = FALSE) & doorOpen = TRUE & (doorIsOpen = TRUE)	
+							& (firstButton = TRUE | firstUpButton = TRUE | thirdButton = TRUE | thirdDownButton = TRUE): TRUE;
+						elevatorLevel = second & (secondButton = FALSE & secondUpButton = FALSE & secondDownButton = FALSE) & doorOpen = TRUE & (doorCanClose = TRUE) : FALSE;
+						
+						elevatorLevel = third & (thirdButton = TRUE | thirdDownButton = TRUE)	: TRUE;
+						elevatorLevel = third & (thirdButton = FALSE & thirdDownButton = FALSE) & doorOpen = FALSE
+							& (firstButton = TRUE | firstUpButton = TRUE | secondButton = TRUE | secondUpButton = TRUE | secondDownButton = TRUE)	: FALSE;
+						elevatorLevel = third & (thirdButton = FALSE & thirdDownButton = FALSE) & doorOpen = TRUE & (doorIsOpen = TRUE)	
+							& (secondButton = TRUE | secondUpButton = TRUE | secondDownButton = TRUE | thirdButton = TRUE | thirdDownButton = TRUE): TRUE;
+						elevatorLevel = third & (thirdButton = FALSE & thirdDownButton = FALSE) & doorOpen = TRUE & (doorCanClose = TRUE) : FALSE;
+							
+						(elevatorLevel = first | elevatorLevel = second | elevatorLevel = third) & openDoorButton = TRUE	: TRUE;
+						(elevatorLevel = first | elevatorLevel = second | elevatorLevel = third) & closeDoorButton = TRUE & (doorIsOpen = TRUE)	: TRUE;
+						(elevatorLevel = first | elevatorLevel = second | elevatorLevel = third) & closeDoorButton = TRUE & doorOpen = TRUE & (doorCanClose = TRUE)	: FALSE;
+						
+						TRUE : doorOpen;
+					esac;
+				
+
+
+--OPEN_TIMER:: 
+--assumptions: whenever any command is given related to opening the door while the gate is still open, timer resets (5 time unit is added)
+				
+	next(remainedAsOpen) := 	case						
+						doorOpen = TRUE & remainedAsOpen = 0	: remainedAsOpen + 1;
+						doorOpen = TRUE & (doorIsOpen = TRUE)	: remainedAsOpen + 1;
+						doorOpen = TRUE & (doorCanClose = TRUE)	: 0;
+						
+						elevatorLevel = first & (firstButton = TRUE | firstUpButton = TRUE)	: 0;	
+						elevatorLevel = first & (firstButton = FALSE & firstUpButton = FALSE) & doorOpen = FALSE
+							& (secondButton = TRUE | secondUpButton = TRUE | secondDownButton = TRUE | thirdButton = TRUE | thirdDownButton = TRUE)	: 0;
+						elevatorLevel = first & (firstButton = FALSE & firstUpButton = FALSE) & doorOpen = TRUE & (doorIsOpen = TRUE)	
+							& (secondButton = TRUE | secondUpButton = TRUE | secondDownButton = TRUE | thirdButton = TRUE | thirdDownButton = TRUE): remainedAsOpen + 1;
+						elevatorLevel = first & (firstButton = FALSE & firstUpButton = FALSE) & doorOpen = TRUE & (doorCanClose = TRUE) : 0;
+						
+						elevatorLevel = second & (secondButton = TRUE | secondUpButton = TRUE | secondDownButton = TRUE)	: 0;
+						elevatorLevel = second & (secondButton = FALSE & secondUpButton = FALSE & secondDownButton = FALSE) & doorOpen = FALSE
+							& (firstButton = TRUE | firstUpButton = TRUE | thirdButton = TRUE | thirdDownButton = TRUE)	: 0;
+						elevatorLevel = second & (secondButton = FALSE & secondUpButton = FALSE & secondDownButton = FALSE) & doorOpen = TRUE & (doorIsOpen = TRUE)	
+							& (firstButton = TRUE | firstUpButton = TRUE | thirdButton = TRUE | thirdDownButton = TRUE): remainedAsOpen + 1;
+						elevatorLevel = second & (secondButton = FALSE & secondUpButton = FALSE & secondDownButton = FALSE) & doorOpen = TRUE & (doorCanClose = TRUE) : 0;
+						
+						elevatorLevel = third & (thirdButton = TRUE | thirdDownButton = TRUE)	: 0;
+						elevatorLevel = third & (thirdButton = FALSE & thirdDownButton = FALSE) & doorOpen = FALSE
+							& (firstButton = TRUE | firstUpButton = TRUE | secondButton = TRUE | secondUpButton = TRUE | secondDownButton = TRUE)	: 0;
+						elevatorLevel = third & (thirdButton = FALSE & thirdDownButton = FALSE) & doorOpen = TRUE & (doorIsOpen = TRUE)	
+							& (secondButton = TRUE | secondUpButton = TRUE | secondDownButton = TRUE | thirdButton = TRUE | thirdDownButton = TRUE): remainedAsOpen + 1;
+						elevatorLevel = third & (thirdButton = FALSE & thirdDownButton = FALSE) & doorOpen = TRUE & (doorCanClose = TRUE) : 0;
+
+						(elevatorLevel = first | elevatorLevel = second | elevatorLevel = third) & openDoorButton = TRUE	: 0;
+						(elevatorLevel = first | elevatorLevel = second | elevatorLevel = third) & closeDoorButton = TRUE & (doorIsOpen = TRUE)	: remainedAsOpen + 1;
+						(elevatorLevel = first | elevatorLevel = second | elevatorLevel = third) & closeDoorButton = TRUE & doorOpen = TRUE & (doorCanClose = TRUE)	: 0;
+						
+						TRUE : remainedAsOpen;
+					esac;
+					
+
+--DIRECTION:: 
+--assumptions: current floor's buttons decide whether steady or not. other directions are trivial.			
+					
+	next(direction) := 	case
+						elevatorLevel = first & (firstButton = FALSE & firstUpButton = FALSE) & (secondButton = TRUE | secondUpButton = TRUE | secondDownButton = TRUE | 
+							thirdButton = TRUE | thirdDownButton = TRUE) & doorOpen = FALSE : up;
+						elevatorLevel = second & (secondButton = FALSE & secondUpButton = FALSE & secondDownButton = FALSE) & 
+							(firstButton = TRUE | firstUpButton = TRUE) & (thirdButton = FALSE & thirdDownButton = FALSE) & doorOpen = FALSE	: down;
+						elevatorLevel = second & (secondButton = FALSE & secondUpButton = FALSE & secondDownButton = FALSE) & 
+							(thirdButton = TRUE | thirdDownButton = TRUE) & doorOpen = FALSE	: up;								
+						elevatorLevel = third & (thirdButton = FALSE & thirdDownButton = FALSE) & (firstButton = TRUE | firstUpButton = TRUE | secondButton = TRUE | 
+							secondUpButton = TRUE | secondDownButton = TRUE) & doorOpen = FALSE : down;
+						
+						elevatorLevel = first & (firstButton = TRUE | firstUpButton = TRUE)	: steady;
+						elevatorLevel = first & (secondButton = FALSE & secondUpButton = FALSE & secondDownButton = FALSE & thirdButton = FALSE & thirdDownButton = FALSE)	: steady;
+						elevatorLevel = second & (secondButton = TRUE | secondUpButton = TRUE | secondDownButton = TRUE)	: steady;
+						elevatorLevel = second & (firstButton = FALSE & firstUpButton = FALSE & thirdButton = FALSE & thirdDownButton = FALSE)	: steady;
+						elevatorLevel = third & (thirdButton = TRUE | thirdDownButton = TRUE)	: steady;
+						elevatorLevel = third & (firstButton = FALSE & firstUpButton = FALSE & secondButton = FALSE & secondUpButton = FALSE & secondDownButton = FALSE)	: steady;
+						
+						TRUE : direction;						
+					esac;
+			
+
+--BUTTONS::
+--assumptions: 	
+		
+	next(openDoorButton) :=	case
+								openDoorButton = TRUE & doorOpen = TRUE		: FALSE;
+								TRUE : openDoorButton;
+							esac;	
+						
+	next(closeDoorButton) :=	case
+								closeDoorButton = TRUE & doorOpen = FALSE		: FALSE;
+								TRUE : closeDoorButton;
+							esac;
+
+	next(firstButton) :=	case
+								firstButton = TRUE & elevatorLevel = first & doorOpen = TRUE		: FALSE;
+								TRUE : firstButton;
+							esac;
+							
+	next(secondButton) :=	case
+								secondButton = TRUE & elevatorLevel = second & doorOpen = TRUE		: FALSE;
+								TRUE : secondButton;
+							esac;
+
+	next(thirdButton) :=	case
+								thirdButton = TRUE & elevatorLevel = third & doorOpen = TRUE		: FALSE;
+								TRUE : thirdButton;
+							esac;
+
+	next(firstUpButton) :=	case
+								firstUpButton = TRUE & elevatorLevel = first & doorOpen = TRUE		: FALSE;
+								TRUE : firstUpButton;
+							esac;
+							
+	next(secondUpButton) :=	case
+								secondUpButton = TRUE & elevatorLevel = second & doorOpen = TRUE		: FALSE;
+								TRUE : secondUpButton;
+							esac;
+							
+	next(secondDownButton) :=	case
+								secondDownButton = TRUE & elevatorLevel = second & doorOpen = TRUE		: FALSE;
+								TRUE : secondDownButton;
+							esac;
+
+	next(thirdDownButton) :=	case
+								thirdDownButton = TRUE & elevatorLevel = third & doorOpen = TRUE		: FALSE;
+								TRUE : thirdDownButton;
+							esac;
+				
+				
+--BUTTON_LIGHTS:: 
+--assumptions: lights are turned off when the request is served and door is opened/closed
+				
+	next(openDoorButtonLight) :=	case
+								openDoorButton = TRUE		: TRUE;
+								openDoorButton = TRUE & doorOpen = TRUE		: FALSE;
+								TRUE : openDoorButtonLight;
+							esac;	
+						
+	next(closeDoorButtonLight) :=	case
+								closeDoorButton = TRUE		: TRUE;
+								closeDoorButton = TRUE & doorOpen = FALSE		: FALSE;
+								TRUE : closeDoorButtonLight;
+							esac;
+
+	next(firstButtonLight) :=	case
+								firstButton = TRUE		: TRUE;
+								firstButton = TRUE & elevatorLevel = first & doorOpen = TRUE		: FALSE;
+								TRUE : firstButtonLight;
+							esac;
+							
+	next(secondButtonLight) :=	case
+								secondButton = TRUE		: TRUE;
+								secondButton = TRUE & elevatorLevel = second & doorOpen = TRUE		: FALSE;
+								TRUE : secondButtonLight;
+							esac;
+
+	next(thirdButtonLight) :=	case
+								thirdButton = TRUE		: TRUE;
+								thirdButton = TRUE & elevatorLevel = third & doorOpen = TRUE		: FALSE;
+								TRUE : thirdButtonLight;
+							esac;
+
+	next(firstUpButtonLight) :=	case
+								firstUpButton = TRUE		: TRUE;
+								firstUpButton = TRUE & elevatorLevel = first & doorOpen = TRUE		: FALSE;	
+								TRUE : firstUpButtonLight;
+							esac;
+							
+	next(secondUpButtonLight) :=	case
+								secondUpButton = TRUE		: TRUE;
+								secondUpButton = TRUE & elevatorLevel = second & doorOpen = TRUE		: FALSE;
+								TRUE : secondUpButtonLight;
+							esac;
+							
+	next(secondDownButtonLight) :=	case
+								secondDownButton = TRUE		: TRUE;
+								secondDownButton = TRUE & elevatorLevel = second & doorOpen = TRUE		: FALSE;
+								TRUE : secondDownButtonLight;
+							esac;
+
+	next(thirdDownButtonLight) :=	case
+								thirdDownButton = TRUE		: TRUE;
+								thirdDownButton = TRUE & elevatorLevel = third & doorOpen = TRUE		: FALSE;
+								TRUE : thirdDownButtonLight;
+							esac;
+
+							
+MODULE main
+
+VAR
+	system : elevatorController();
+	
+--1.1# ELEVATOR REACHES EVERY LEVELS CORRECTLY UPON CALLING AND DOOR OPENS
+LTLSPEC G ((system.firstButton = TRUE | system.firstUpButton = TRUE) -> F (system.elevatorLevel = first & system.doorOpen = TRUE))
+LTLSPEC G ((system.secondButton = TRUE | system.secondUpButton = TRUE | system.secondDownButton = TRUE) -> F (system.elevatorLevel = second & system.doorOpen = TRUE))
+LTLSPEC G ((system.thirdButton = TRUE | system.thirdDownButton = TRUE) -> F (system.elevatorLevel = third & system.doorOpen = TRUE))
+
+
+--1.2# DOOR OPENS AND CLOSES AT ALL LEVELS
+LTLSPEC G ((system.elevatorLevel = first & system.doorOpen = FALSE & system.openDoorButton = TRUE) -> F (system.elevatorLevel = first & system.doorOpen = TRUE))
+LTLSPEC G ((system.elevatorLevel = second & system.doorOpen = FALSE & system.openDoorButton = TRUE) -> F (system.elevatorLevel = second & system.doorOpen = TRUE))
+LTLSPEC G ((system.elevatorLevel = third & system.doorOpen = FALSE & system.openDoorButton = TRUE) -> F (system.elevatorLevel = third & system.doorOpen = TRUE))
+LTLSPEC G ((system.elevatorLevel = first & system.doorOpen = TRUE & system.closeDoorButton = TRUE) -> F (system.elevatorLevel = first & system.doorOpen = FALSE))
+LTLSPEC G ((system.elevatorLevel = second & system.doorOpen = TRUE & system.closeDoorButton = TRUE) -> F (system.elevatorLevel = second & system.doorOpen = FALSE))
+LTLSPEC G ((system.elevatorLevel = third & system.doorOpen = TRUE & system.closeDoorButton = TRUE) -> F (system.elevatorLevel = third & system.doorOpen = FALSE))
+
+
+--1.3# DOOR REMAINS OPEN FOR 5 TIME UNITS
+LTLSPEC G ((system.remainedAsOpen = 0) -> (system.doorOpen = FALSE))
+LTLSPEC G ((system.remainedAsOpen = 1) -> (system.doorOpen = TRUE))
+LTLSPEC G ((system.remainedAsOpen = 5) -> (system.doorOpen = TRUE))
+LTLSPEC G ((system.remainedAsOpen = 6) -> (system.doorOpen = FALSE))
+LTLSPEC G ((system.elevatorLevel = first & system.doorIsOpen = TRUE & system.closeDoorButton = TRUE) -> F (system.elevatorLevel = first & system.doorOpen = TRUE))
+LTLSPEC G ((system.elevatorLevel = second & system.doorIsOpen = TRUE & system.closeDoorButton = TRUE) -> F (system.elevatorLevel = second & system.doorOpen = TRUE))
+LTLSPEC G ((system.elevatorLevel = third & system.doorIsOpen = TRUE & system.closeDoorButton = TRUE) -> F (system.elevatorLevel = third & system.doorOpen = TRUE))
+LTLSPEC G ((system.elevatorLevel = first & system.doorCanClose = TRUE & system.closeDoorButton = TRUE) -> F (system.elevatorLevel = first & system.doorOpen = FALSE))
+LTLSPEC G ((system.elevatorLevel = second & system.doorCanClose = TRUE & system.closeDoorButton = TRUE) -> F (system.elevatorLevel = second & system.doorOpen = FALSE))
+LTLSPEC G ((system.elevatorLevel = third & system.doorCanClose = TRUE & system.closeDoorButton = TRUE) -> F (system.elevatorLevel = third & system.doorOpen = FALSE))
+
+
+--1.4# ALL BUTTON_LIGHTS WORK PROPERLY
+LTLSPEC G ((system.openDoorButton = TRUE) -> F (system.openDoorButtonLight = TRUE))
+LTLSPEC G ((system.closeDoorButton = TRUE) -> F (system.closeDoorButtonLight = TRUE))	
+LTLSPEC G ((system.firstButton = TRUE) -> F (system.firstButtonLight = TRUE))	
+LTLSPEC G ((system.secondButton = TRUE) -> F (system.secondButtonLight = TRUE))	
+LTLSPEC G ((system.thirdButton = TRUE) -> F (system.thirdButtonLight = TRUE))	
+LTLSPEC G ((system.firstUpButton = TRUE) -> F (system.firstUpButtonLight = TRUE))	
+LTLSPEC G ((system.secondUpButton = TRUE) -> F (system.secondUpButtonLight = TRUE))			
+LTLSPEC G ((system.secondDownButton = TRUE) -> F (system.secondDownButtonLight = TRUE))	
+LTLSPEC G ((system.thirdDownButton = TRUE) -> F (system.thirdDownButtonLight = TRUE))	
+
+
+--2# SAFETY PROPERTY
+LTLSPEC G ( !(system.doorOpen = TRUE & (system.direction = up | system.direction = down) ))

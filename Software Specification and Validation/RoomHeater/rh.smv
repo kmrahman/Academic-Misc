@@ -1,0 +1,198 @@
+MODULE main
+VAR
+	room : {idleNoHeat, waitForHeat, idleHeat, waitForCool};
+	controller : {idle, actHeater, heaterRun, off, error };
+	furnace : {furnaceRun, furnaceOff, furnaceAct, furnaceErr };
+	
+	roomTemp : 68..74;
+	waitedForWarm : 0..3;
+	waitedForCool : 0..3;
+	valvePos : 0..2;
+	furnaceStartupTime : 0..3;
+	
+	requestHeat :  boolean;
+	furnaceRunning : boolean;
+	activate : boolean;
+	deactivate : boolean;
+	
+	furnaceFault : boolean;
+	furnaceReset : boolean;
+	userReset : boolean;
+	heatingSwitchOff : boolean;
+	heatingSwitchOn : boolean;
+	
+DEFINE
+	desiredTemp := 71;
+	warmUpTimer := 3;
+	coolDownTimer := 3;
+
+	furnaceTimer := 3;
+
+	tooCold := (desiredTemp - roomTemp)> 2;
+	tooHot := (roomTemp - desiredTemp)> 2;
+
+	noHeatReq := (room = idleNoHeat) | (room = waitForHeat);
+	heatReq := (room = idleHeat) | (room = waitForCool);
+
+	heaterActive := (controller = actHeater) | (controller = heaterRun);
+	furnaceNormal := (furnace = furnaceRun) | (furnace = furnaceOff) | (furnace = furnaceAct);
+
+ASSIGN
+init(room) := idleNoHeat;
+init(roomTemp) := 70;
+init(warmUpTimer) := 0;
+init(coolDownTimer) := 0;
+
+next(room) := 
+	case
+		(tooCold = TRUE) &(room = idleNoHeat) : waitForHeat;
+		(tooCold = FALSE) & (room = waitForHeat ) :idleNoHeat;
+		(room = waitForHeat) & (waitedForWarm < warmUpTimer): waitForHeat;
+		(room = waitForHeat) & (waitedForWarm = warmUpTimer) & (valvePos < 2): waitForHeat;
+		(room = waitForHeat) & (waitedForWarm = warmUpTimer) & (valvePos = 2) & (tooCold = TRUE) : idleHeat;
+		(tooHot = TRUE) &(room = idleHeat) : waitForCool;
+
+		TRUE : room;
+	esac;
+
+--valvePos var 
+next(valvePos) :=
+	case
+		(room = idleNoHeat) & ( tooCold = TRUE) & ( valvePos<2) : valvePos + 1;
+		(room = waitForHeat) & (waitedForWarm = warmUpTimer) & (valvePos < 2): valvePos + 1;
+
+		(room = idleHeat) & ( tooHot = TRUE) & ( valvePos > 0) : valvePos - 1;
+		(room = waitForCool) & (waitedForCool = coolDownTimer) & (valvePos >0 ): valvePos - 1;
+
+		TRUE : valvePos;
+	esac;
+	
+--waitedForWarm var
+next(waitedForWarm) :=
+	case
+		(room = idleNoHeat) & (tooCold = TRUE) : 0;
+		(room = waitForHeat) & (waitedForWarm < warmUpTimer): waitedForWarm +1;
+		(room = waitForHeat) & (waitedForWarm = warmUpTimer) & (valvePos < 2): 0;
+
+		TRUE : waitedForWarm;
+	esac;
+
+--waitedForCool var
+next(waitedForCool) :=
+	case
+		(room = idleHeat) & (tooHot = TRUE) : 0;
+		(room = waitForCool) & (waitedForCool < coolDownTimer): waitedForCool +1;
+		(room = waitForCool) & (waitedForCool = coolDownTimer) & (valvePos >0 ): 0;
+		
+		TRUE : waitedForCool;
+	esac;
+
+
+--requestHeat var
+init(requestHeat) := FALSE;
+next(requestHeat) :=
+	case
+	(room = waitForHeat) & (waitedForWarm = warmUpTimer) & (valvePos = 2) & (tooCold = TRUE) : TRUE;
+	(room = waitForCool) & (waitedForCool = coolDownTimer) & (valvePos = 0) & (tooHot = TRUE) : FALSE;
+
+		TRUE : requestHeat;
+	esac;
+
+--controller states
+init(controller) := idle;
+next(controller) :=
+	case
+		(controller = idle) & (requestHeat = TRUE) : actHeater;
+		(controller = actHeater) & (furnaceRunning = TRUE) : heaterRun;
+		(controller = actHeater) & (requestHeat = FALSE) : idle;
+		(controller = heaterRun) & (requestHeat = FALSE) : idle;
+		
+		(controller = idle) & (furnaceFault) : error;
+		(controller = actHeater) & (furnaceFault) : error;
+		(controller = heaterRun) & (furnaceFault) : error;
+
+		(controller = idle) & (heatingSwitchOff) : off;
+		(controller = actHeater) & (heatingSwitchOff) : off;
+		(controller = heaterRun) & (heatingSwitchOff) : off;
+		
+		(controller = off) & (heatingSwitchOn) : idle;
+		(controller = error) & (userReset) : off;
+		
+		
+		TRUE : controller;
+	esac;
+		
+--activate
+init(activate) := FALSE;
+next(activate) :=
+	case
+		(controller = idle) & (requestHeat = TRUE) : TRUE;
+		TRUE : activate;
+	esac;
+		
+
+--deactivate
+init(deactivate) := FALSE;
+next(deactivate) :=
+	case
+		(controller = actHeater) & (requestHeat = FALSE) : TRUE;
+		(controller = heaterRun) & (requestHeat = FALSE) :TRUE;
+
+		(controller = idle) & (heatingSwitchOff) : TRUE;
+		(controller = actHeater) & (heatingSwitchOff) : TRUE;
+		(controller = heaterRun) & (heatingSwitchOff) : TRUE;
+		
+		TRUE : activate;
+	esac;
+	
+-- furnace
+init(furnace) := furnaceOff;
+init(furnaceFault) := FALSE;
+
+next(furnace) :=
+	case
+		(furnace = furnaceOff) & (activate = TRUE) : furnaceAct;
+		(furnace = furnaceAct) & (deactivate = TRUE) : furnaceOff;
+		(furnace = furnaceAct) & (furnaceStartupTime< furnaceTimer): furnaceAct;
+		(furnace = furnaceAct) & (furnaceStartupTime = furnaceTimer): furnaceRun;
+		(furnace = furnaceRun) & (deactivate = TRUE) : furnaceOff;
+		
+		(furnace = furnaceOff) & (furnaceFault = TRUE) : furnaceErr;
+		(furnace = furnaceErr) & (furnaceReset = TRUE) : furnaceOff;
+		TRUE : furnace;
+	esac;
+
+-- furnaceStartupTime
+init(furnaceStartupTime) := 0;
+next(furnaceStartupTime) :=
+	case
+		(furnace = furnaceOff)& (activate = TRUE) : 0;
+		(furnace = furnaceAct) & (furnaceStartupTime< furnaceTimer): furnaceStartupTime + 1 ;
+		(furnace = furnaceErr) & (furnaceReset = TRUE) : 0;
+		TRUE : furnaceStartupTime;
+	esac;
+-- furnaceRunning
+init(furnaceRunning) := FALSE;
+next(furnaceRunning) :=
+	case
+		(furnace = furnaceAct) & (furnaceStartupTime = furnaceTimer): TRUE ;
+		TRUE : furnaceRunning;
+	esac;
+	
+-- furnaceReset
+init(furnaceReset) := FALSE;
+next(furnaceReset) :=
+	case
+		(controller = error) & (userReset = TRUE): TRUE ;
+		TRUE : furnaceReset;
+	esac;
+	
+
+CTLSPEC
+EF (room = waitForHeat)
+CTLSPEC
+EF ( room = idleNoHeat )
+CTLSPEC
+EF ( tooCold = TRUE )
+
+	

@@ -1,0 +1,34 @@
+--Property 1
+CTLSPEC EF(room = idleNoHeat)
+CTLSPEC EF(room = waitForHeat)
+CTLSPEC EF(room = idleHeat)
+CTLSPEC EF(room = waitForCool)
+
+CTLSPEC EF(controller = idle)
+CTLSPEC EF(controller = actHeater)
+CTLSPEC EF(controller = heaterRun)
+CTLSPEC EF(controller = off)
+CTLSPEC EF(controller = error)
+
+CTLSPEC EF(furnace  = furnaceOff)
+CTLSPEC EF(furnace  = furnaceAct)
+CTLSPEC EF(furnace  = furnaceErr)
+
+--Property 2
+CTLSPEC AG ( (tooCold = TRUE) & (valvePos = 2)) ->  EF(furnace = furnaceAct) & EF(furnace = furnaceRun)
+
+LTLSPEC G ((tooCold = TRUE) & (valvePos = 2)) -> F(requestHeat = TRUE )
+--Property 3
+CTLSPEC AG ( (tooHot = TRUE) & (valvePos = 0)) ->  EF(furnace = idleHeat) 
+
+LTLSPEC G ((tooHot = TRUE) & (valvePos = 0)) -> F(requestHeat = FALSE )
+	
+--Property 4
+CTLSPEC EG( (furnace = furnaceRun)  -> EX(controller = heaterRun))
+
+LTLSPEC G ((furnace = furnaceRun ) | (furnace = furnaceAct)) -> ((controller = actHeater) | (controller = heaterRun))
+
+--Error Property
+
+LTLSPEC G ( (furnace = furnaceRun) & ( furnaceFault = TRUE)  -> F( (furnace = furnaceErr)))
+LTLSPEC ( ((furnace = furnaceRun) & ( furnaceFault) & X(!heatingSwitchOff))   -> X(controller = error))

@@ -1,0 +1,101 @@
+MODULE main
+VAR
+	room : {idleNoHeat, waitForHeat, idleHeat, waitForCool};
+	controller : {idle, actHeater, heaterRun, off, error };
+	furnace : {furnaceRun, furnaceOff, furnaceAct, furnaceErr };
+	
+	roomTemp : 68..74;
+	waitedForWarm : 0..3;
+	waitedForCool : 0..3;
+	valvePos : 0..2;
+	furnaceStartupTime : 0..3;
+	
+	requestHeat :  boolean;
+	furnaceRunning : boolean;
+	activate : boolean;
+	deactivate : boolean;
+	
+	furnaceFault : boolean;
+	furnaceReset : boolean;
+	userReset : boolean;
+	heatingSwitchOff : boolean;
+	heatingSwitchOn : boolean;
+	
+DEFINE
+	desiredTemp := 71;
+	warmUpTimer := 3;
+	coolDownTimer := 3;
+
+	furnaceTimer := 3;
+
+	tooCold := (desiredTemp - roomTemp)> 2;
+	tooHot := (roomTemp - desiredTemp)> 2;
+
+	noHeatReq := (room = idleNoHeat) | (room = waitForHeat);
+	heatReq := (room = idleHeat) | (room = waitForCool);
+
+	heaterActive := (controller = actHeater) | (controller = heaterRun);
+	furnaceNormal := (furnace = furnaceRun) | (furnace = furnaceOff) | (furnace = furnaceAct);
+
+ASSIGN
+init(room) := idleNoHeat;
+init(roomTemp) := 68;
+
+next(room) := 
+	case
+		(tooCold = TRUE) &(room = idleNoHeat) : waitForHeat;
+		(tooCold = FALSE) & (room = waitForHeat ) :idleNoHeat;
+		(room = waitForHeat) & (waitedForWarm < warmUpTimer): waitForHeat;
+		(room = waitForHeat) & (waitedForWarm = warmUpTimer) & (valvePos < 2): waitForHeat;
+		(room = waitForHeat) & (waitedForWarm = warmUpTimer) & (valvePos = 2) & (tooCold = TRUE) : idleHeat;
+		(tooHot = TRUE) &(room = idleHeat) : waitForCool;
+
+		TRUE : room;
+	esac;
+
+--valvePos var 
+next(valvePos) :=
+	case
+		(room = idleNoHeat) & ( tooCold = TRUE) & ( valvePos<2) : valvePos + 1;
+		(room = waitForHeat) & (waitedForWarm = warmUpTimer) & (valvePos < 2): valvePos + 1;
+
+		(room = idleHeat) & ( tooHot = TRUE) & ( valvePos > 0) : valvePos - 1;
+		(room = waitForCool) & (waitedForCool = coolDownTimer) & (valvePos >0 ): valvePos - 1;
+
+		TRUE : valvePos;
+	esac;
+	
+--waitedForWarm var
+next(waitedForWarm) :=
+	case
+		(room = idleNoHeat) & (tooCold = TRUE) : 0;
+		(room = waitForHeat) & (waitedForWarm < warmUpTimer): waitedForWarm +1;
+		(room = waitForHeat) & (waitedForWarm = warmUpTimer) & (valvePos < 2): 0;
+
+		TRUE : waitedForWarm;
+	esac;
+
+--waitedForCool var
+next(waitedForCool) :=
+	case
+		(room = idleHeat) & (tooHot = TRUE) : 0;
+		(room = waitForCool) & (waitedForCool < coolDownTimer): waitedForCool +1;
+		(room = waitForCool) & (waitedForCool = coolDownTimer) & (valvePos >0 ): 0;
+		
+		TRUE : waitedForCool;
+	esac;
+
+
+	
+--requestHeat var
+init(requestHeat) := FALSE;
+next(requestHeat) :=
+	case
+	(room = waitForHeat) & (waitedForWarm = warmUpTimer) & (valvePos = 2) & (tooCold = TRUE) : TRUE;
+	(room = waitForCool) & (waitedForCool = coolDownTimer) & (valvePos = 0) & (tooHot = TRUE) : FALSE;
+
+		TRUE : requestHeat;
+	esac;
+
+
+LTLSPEC G ((tooCold = TRUE) & (valvePos = 2)) -> F(requestHeat = TRUE )

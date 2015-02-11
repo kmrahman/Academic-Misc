@@ -1,0 +1,3 @@
+-- specification EF tooCold = TRUE  is true
+-- specification EF room = waitForHeat  is true
+-- specification EF room = idleNoHeat  is true
