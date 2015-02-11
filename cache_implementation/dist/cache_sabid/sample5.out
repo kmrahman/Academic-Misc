@@ -1,0 +1,12 @@
+Load-Hits: 823241, 99.33%
+Load-Misses: 5561, 0.67%
+Load-Accesses: 828802, 100.00%
+ 
+Store-Hits: 313727, 99.41%
+Store-Misses: 1873, 0.59%
+Store-Accesses: 315600, 100.00%
+ 
+Total-Hits: 1136968, 99.35%
+Total-Misses: 7434, 0.65%
+Total-Accesses:1144402, 100.00%
+

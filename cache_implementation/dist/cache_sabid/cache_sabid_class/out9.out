@@ -1,0 +1,12 @@
+
+Load-Hits: 53,86.88524590163935%
+Load-Misses:8,13%
+Load-Accesses:61, 100.00%
+
+Store-Hits:30,76%
+Store-Misses:9,23%
+Store-Accesses:39, 100.00%
+
+ Total-Hits:83,83%
+ Total-Misses:17,17% 
+ Total-Accesses:100,100.00%
